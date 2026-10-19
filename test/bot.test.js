@@ -46,7 +46,7 @@ function fixture(adminIds = new Set()) {
   return { db, store, calls, bot, users, message, callback, get broadcastsWoken() { return broadcastsWoken; } };
 }
 
-test('anonymous link routes many visitors and keeps both identities out of delivered messages', async (t) => {
+test('every text message has sender and reply actions without exposing sender until requested', async (t) => {
   const f = fixture();
   t.after(() => f.db.close());
   const { owner, visitor, another } = f.users;
@@ -56,26 +56,34 @@ test('anonymous link routes many visitors and keeps both identities out of deliv
   assert.ok(startMessages[0].text.startsWith('<b>Shaxsiy havolangiz:</b>'));
   assert.equal(startMessages[0].extra.reply_markup.inline_keyboard[0][0].text, 'Ulashish');
   assert.equal(startMessages[0].extra.reply_markup.inline_keyboard.length, 1);
-  assert.equal(startMessages[1].text, 'Anonim botga xush kelibsiz. Qanday havola yaratasiz?');
+  assert.equal(startMessages[1].text, 'Xabar botiga xush kelibsiz. Shaxsiy havolangiz tayyor.');
   assert.deepEqual(startMessages[1].extra.reply_markup.keyboard.map((row) => row.map((item) => item.text)), [
-    ['🔒 Ikki tomonlama anonim'],
-    ['📩 Bir tomonlama xabar'],
     ['🔗 Mening havolalarim'],
     ['📊 Profil', '❔ Yordam'],
   ]);
   assert.equal(startMessages[1].extra.reply_markup.is_persistent, true);
   assert.equal(startMessages[1].extra.reply_markup.inline_keyboard, undefined);
-  await f.callback(owner, 'make:anonymous');
   const link = f.store.listLinks(owner.id)[0];
   await f.message(visitor, { text: `/start ${link.token}` });
   await f.message(another, { text: `/start ${link.token}` });
   await f.message(visitor, { text: 'Salom', forward_origin: { type: 'user', sender_user: visitor } });
   await f.message(another, { text: 'Assalomu alaykum' });
   const ownerMessages = f.calls.filter((c) => c.method === 'sendMessage' && c.chatId === '101');
-  assert.equal(ownerMessages.filter((c) => c.text.startsWith('✉️ Sizda yangi anonim xabar bor!')).length, 2);
+  assert.equal(ownerMessages.filter((c) => c.text.startsWith('✉️ Sizda yangi xabar bor!')).length, 2);
   assert.ok(ownerMessages.some((c) => c.text.includes('Salom')));
   assert.ok(!ownerMessages.some((c) => c.text.includes('visitor_username') || c.text.includes('202')));
-  const replyData = ownerMessages.find((c) => c.text.includes('Salom')).extra.reply_markup.inline_keyboard[0][0].callback_data;
+  const incomingActions = ownerMessages.find((c) => c.text.includes('Salom')).extra.reply_markup.inline_keyboard;
+  assert.equal(incomingActions[0][0].text, '👤 Yuboruvchini ko‘rish');
+  assert.equal(incomingActions[1][0].text, '🔁 Javob berish');
+  await f.callback(another, incomingActions[0][0].callback_data);
+  assert.ok(!f.calls.some((c) => c.chatId === '303' && c.text?.includes('Telegram ID: 202')));
+  await f.callback(owner, incomingActions[0][0].callback_data);
+  const senderDetails = f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('👤 Yuboruvchi'));
+  assert.match(senderDetails.text, /Visitor/);
+  assert.match(senderDetails.text, /@visitor_username/);
+  assert.match(senderDetails.text, /Telegram ID: 202/);
+  assert.equal(senderDetails.extra.reply_markup.inline_keyboard[0][0].url, 'tg://user?id=202');
+  const replyData = incomingActions[1][0].callback_data;
   await f.callback(owner, replyData);
   await f.message(owner, { text: 'Javob' });
   const visitorMessages = f.calls.filter((c) => c.method === 'sendMessage' && c.chatId === '202');
@@ -83,15 +91,12 @@ test('anonymous link routes many visitors and keeps both identities out of deliv
   assert.ok(!visitorMessages.some((c) => c.text.includes('owner_username') || c.text.includes('101')));
 });
 
-test('one-way visitor sees the same entry screen; owner receives sender profile', async (t) => {
+test('old one-way links deliver media with the same actions and hide identity until requested', async (t) => {
   const f = fixture();
   t.after(() => f.db.close());
   const { owner, visitor } = f.users;
   await f.message(owner, { text: '/start' });
-  const personalBefore = f.store.getOrCreatePersonalLink(owner.id);
-  await f.callback(owner, 'make:open_sender');
-  const link = f.store.listLinks(owner.id)[0];
-  assert.equal(link.token, personalBefore.token);
+  const link = f.store.createLink(owner.id, 'open_sender');
   assert.equal(link.mode, 'open_sender');
   await f.message(visitor, { text: `/start ${link.token}` });
   const entry = f.calls.find((c) => c.chatId === '202' && c.text === '<b>Murojaatingizni shuyerga yozing!</b>');
@@ -103,17 +108,39 @@ test('one-way visitor sees the same entry screen; owner receives sender profile'
     photo: [{ file_id: 'file' }], caption: 'Rasm',
     caption_entities: [{ type: 'text_mention', offset: 0, length: 4, user: visitor }],
   });
-  const ownerInfo = f.calls.find((c) => c.chatId === '101' && c.text?.startsWith('Yangi xabar:'));
-  assert.match(ownerInfo.text, /visitor_username/);
-  assert.match(ownerInfo.text, /tg:\/\/user\?id=202/);
+  const ownerInfo = f.calls.findLast((c) => c.chatId === '101' && c.text === '✉️ Sizda yangi xabar bor!');
+  assert.ok(ownerInfo);
+  assert.ok(!f.calls.some((c) => c.chatId === '101' && c.text?.includes('visitor_username')));
   const copied = f.calls.find((c) => c.method === 'copyMessage' && c.chatId === '101');
   assert.deepEqual(copied.extra.caption_entities, []);
   assert.equal(copied.extra.protect_content, true);
+  assert.deepEqual(copied.extra.reply_markup.inline_keyboard.map((row) => row[0].text),
+    ['👤 Yuboruvchini ko‘rish', '🔁 Javob berish']);
+  await f.callback(owner, copied.extra.reply_markup.inline_keyboard[0][0].callback_data);
+  assert.ok(f.calls.some((c) => c.chatId === '101' && c.text?.includes('@visitor_username')));
+  await f.callback(owner, copied.extra.reply_markup.inline_keyboard[1][0].callback_data);
+  await f.message(owner, { text: 'Rasmga javob' });
+  assert.ok(f.calls.some((c) => c.chatId === '202' && c.text === 'Rasmga javob'));
   assert.ok(!f.calls.some((c) => c.chatId === '202' && c.text?.includes('owner_username')));
   const confirmationIndex = f.calls.findIndex((c) => c.chatId === '202' && c.text === 'Xabaringiz yuborildi!');
   const ownLinkIndex = f.calls.findIndex((c, i) => i > confirmationIndex && c.chatId === '202' && c.text?.startsWith('<b>Shaxsiy havolangiz:</b>'));
   assert.ok(ownLinkIndex > confirmationIndex);
   assert.equal(f.calls[ownLinkIndex].extra.reply_markup.inline_keyboard.length, 1);
+});
+
+test('long text keeps both actions on the delivered text message', async (t) => {
+  const f = fixture();
+  t.after(() => f.db.close());
+  const { owner, visitor } = f.users;
+  await f.message(owner, { text: '/start' });
+  const link = f.store.getOrCreatePersonalLink(owner.id);
+  await f.message(visitor, { text: `/start ${link.token}` });
+  const longText = 'A'.repeat(4000);
+  await f.message(visitor, { text: longText });
+  const delivered = f.calls.find((c) => c.chatId === '101' && c.text === longText);
+  assert.ok(delivered);
+  assert.deepEqual(delivered.extra.reply_markup.inline_keyboard.map((row) => row[0].text),
+    ['👤 Yuboruvchini ko‘rish', '🔁 Javob berish']);
 });
 
 test('admin campaign needs admin identity and explicit confirmation', async (t) => {
@@ -144,7 +171,7 @@ test('personal login, auto reply and profile statistics are free', async (t) => 
   const personalMessage = f.calls.find((c) => c.chatId === '101' && c.text?.includes(personal.token));
   assert.ok(personalMessage);
   assert.match(personalMessage.extra.reply_markup.inline_keyboard[0][0].url, /^https:\/\/t\.me\/share\/url\?/);
-  assert.match(decodeURIComponent(personalMessage.extra.reply_markup.inline_keyboard[0][0].url), /Menga anonim xabar yuboring:/);
+  assert.match(decodeURIComponent(personalMessage.extra.reply_markup.inline_keyboard[0][0].url), /Menga xabar yuboring:/);
   await f.message(owner, { text: '/login' });
   const loginPrompt = f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('<b>Yangi login kiriting</b>'));
   assert.equal(loginPrompt.extra.reply_markup.inline_keyboard[0][0].text, '✖️ Bekor qilish');
@@ -171,7 +198,7 @@ test('personal login, auto reply and profile statistics are free', async (t) => 
   assert.ok(f.calls.some((c) => c.chatId === '101' && c.text?.includes('Obuna va to‘lov talab qilinmaydi')));
 });
 
-test('block and unban work without revealing an anonymous visitor', async (t) => {
+test('block and unban work without revealing the visitor in incoming message', async (t) => {
   const f = fixture();
   t.after(() => f.db.close());
   const { owner, visitor } = f.users;
@@ -180,12 +207,11 @@ test('block and unban work without revealing an anonymous visitor', async (t) =>
   await f.message(visitor, { text: `/start ${personal.token}` });
   await f.message(visitor, { text: 'Birinchi xabar' });
   const ownerMessage = f.calls.find((c) => c.chatId === '101' && c.text?.includes('Birinchi xabar'));
-  await f.callback(owner, ownerMessage.extra.reply_markup.inline_keyboard[0][0].callback_data);
+  await f.callback(owner, ownerMessage.extra.reply_markup.inline_keyboard[1][0].callback_data);
   const replyPrompt = f.calls.findLast((c) => c.chatId === '101' && c.text === 'Javobingizni yozing!');
   const blockData = replyPrompt.extra.reply_markup.inline_keyboard[1][0].callback_data;
   await f.callback(owner, blockData);
   assert.equal(f.store.getContext(owner.id), undefined);
-  await f.callback(owner, 'mode:open_sender');
   await f.callback(visitor, `again:${personal.token}`);
   await f.message(visitor, { text: 'Ikkinchi xabar' });
   assert.ok(f.calls.some((c) => c.chatId === '202' && c.text?.includes('xabar yubora olmaysiz')));
@@ -221,21 +247,17 @@ test('sponsored broadcasts only target users who opted in', async (t) => {
   assert.equal(f.store.nextBroadcastUser(job.id, job.kind), undefined);
 });
 
-test('one personal URL changes mode and cancel ends the visitor flow', async (t) => {
+test('one personal URL has no mode controls and cancel ends the visitor flow', async (t) => {
   const f = fixture();
   t.after(() => f.db.close());
   const { owner, visitor } = f.users;
   await f.message(owner, { text: '/start' });
   const first = f.store.getOrCreatePersonalLink(owner.id);
-  await f.callback(owner, 'mode:open_sender');
-  assert.equal(f.store.getOrCreatePersonalLink(owner.id).token, first.token);
-  assert.equal(f.store.getLink(first.token).mode, 'open_sender');
-  const edited = f.calls.findLast((c) => c.method === 'editMessageText' && c.chatId === '101');
-  assert.ok(edited.text.includes(first.token));
-  assert.equal(edited.extra.reply_markup.inline_keyboard.length, 1);
-  await f.callback(owner, 'mode:anonymous');
+  await f.callback(owner, 'mode:open_sender'); // A stale button must not change the link.
   assert.equal(f.store.getOrCreatePersonalLink(owner.id).token, first.token);
   assert.equal(f.store.getLink(first.token).mode, 'anonymous');
+  assert.equal(f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('Xabar botiga'))
+    .extra.reply_markup.keyboard.length, 2);
   await f.message(visitor, { text: `/start ${first.token}` });
   const prompt = f.calls.findLast((c) => c.chatId === '202' && c.text === '<b>Murojaatingizni shuyerga yozing!</b>');
   assert.equal(prompt.extra.reply_markup.inline_keyboard[0][0].callback_data, 'cancel');
@@ -246,7 +268,7 @@ test('one personal URL changes mode and cancel ends the visitor flow', async (t)
   assert.ok(!f.calls.some((c) => c.chatId === '101' && c.text?.includes('Yetkazilmasin')));
 });
 
-test('an existing anonymous reply still works after the owner changes link mode', async (t) => {
+test('an existing reply still works after the old link is closed', async (t) => {
   const f = fixture();
   t.after(() => f.db.close());
   const { owner, visitor } = f.users;
@@ -255,8 +277,8 @@ test('an existing anonymous reply still works after the owner changes link mode'
   await f.message(visitor, { text: `/start ${link.token}` });
   await f.message(visitor, { text: 'Savol' });
   const incoming = f.calls.find((c) => c.chatId === '101' && c.text?.includes('Savol'));
-  const replyAction = incoming.extra.reply_markup.inline_keyboard[0][0].callback_data;
-  await f.callback(owner, 'mode:open_sender');
+  const replyAction = incoming.extra.reply_markup.inline_keyboard[1][0].callback_data;
+  f.store.deactivateLink(link.token, owner.id);
   await f.callback(owner, replyAction);
   await f.message(owner, { text: 'Javob' });
   assert.ok(f.calls.some((c) => c.chatId === '202' && c.text === 'Javob'));
@@ -299,14 +321,13 @@ test('help matches the reference and unban all clears only the owner’s blocks'
   assert.equal(f.store.isConversationBlocked(otherConversation.id), true);
 });
 
-test('the screenshot menu is persistent below the composer and opens working sections', async (t) => {
+test('the simplified menu is persistent below the composer and opens working sections', async (t) => {
   const f = fixture();
   t.after(() => f.db.close());
   const { owner } = f.users;
   await f.message(owner, { text: '/start' });
-  const menu = f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('Anonim botga xush'));
+  const menu = f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('Xabar botiga xush'));
   assert.deepEqual(menu.extra.reply_markup.keyboard.map((row) => row.map((item) => item.text)), [
-    ['🔒 Ikki tomonlama anonim'], ['📩 Bir tomonlama xabar'],
     ['🔗 Mening havolalarim'], ['📊 Profil', '❔ Yordam'],
   ]);
   await f.message(owner, { text: '/premium' });
@@ -319,8 +340,8 @@ test('the screenshot menu is persistent below the composer and opens working sec
   assert.ok(f.calls.some((c) => c.chatId === '101' && c.text?.startsWith('<b>Botimiz orqali')));
   await f.message(owner, { text: '🔗 Mening havolalarim' });
   assert.ok(f.calls.findLast((c) => c.chatId === '101').text.startsWith('<b>Shaxsiy havolangiz:</b>'));
-  await f.message(owner, { text: '📩 Bir tomonlama xabar' });
-  assert.equal(f.store.getOrCreatePersonalLink(owner.id).mode, 'open_sender');
-  await f.message(owner, { text: '🔒 Ikki tomonlama anonim' });
+  await f.message(owner, { text: '📩 Bir tomonlama xabar' }); // Old persistent keyboard text refreshes it.
   assert.equal(f.store.getOrCreatePersonalLink(owner.id).mode, 'anonymous');
+  assert.equal(f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('Xabar botiga'))
+    .extra.reply_markup.keyboard.length, 2);
 });

@@ -1,15 +1,14 @@
-# Anonim Telegram bot
+# Telegram xabar bot
 
 Node.js 24+ bot. Lokal testlarda SQLite, VPSdagi Docker deployda PostgreSQL ishlatiladi. Hamma foydalanuvchi imkoniyatlari bepul; obuna va to‘lov yo‘q.
 
-## Rejimlar
+## Xabar almashish
 
-- **Ikki tomonlama anonim:** har bir yozuvchi bilan alohida suhbat ochiladi. Egasi `Javob berish` tugmasi orqali javob qaytaradi. Bot boshqa tomonning Telegram ID yoki username'ini xabarda ko‘rsatmaydi.
-- **Bir tomonlama xabar:** yozuvchi link egasini ko‘rmaydi; egasi yozuvchining ismi, username'i (bo‘lsa) va profil havolasini oladi. Telegram mijozining maxfiylik sozlamalari profil havolasi orqali bevosita yozishni cheklashi mumkin.
+Har odamga **bitta shaxsiy havola** beriladi. `/start` avval havolani `Ulashish` tugmasi bilan ko‘rsatadi, so‘ng yozish maydoni ostida doim turadigan menyuni ochadi: `Mening havolalarim`, `Profil`, `Yordam`. Rejim tanlash yo‘q. Ilgari yaratilgan har ikkala turdagi havolalar ham ishlashda davom etadi va endi bir xil tartibda xabar yetkazadi.
 
-Har odamga **bitta shaxsiy havola** beriladi. `/start` avval havolani `Ulashish` tugmasi bilan ko‘rsatadi, so‘ng yozish maydoni ostida doim turadigan menyuni ochadi: `Ikki tomonlama anonim`, `Bir tomonlama xabar`, `Mening havolalarim`, `Profil`, `Yordam`. Tur tanlanganda havola o‘zgarmaydi, faqat uning rejimi almashadi.
+Boshqa odam havolani ochsa, **“Murojaatingizni shuyerga yozing!”** matni va `Bekor qilish` tugmasi chiqadi. Xabar yuborilgach **“Xabaringiz yuborildi!”**, `Yana xabar yuborish` tugmasi va yozuvchining o‘z shaxsiy havolasi ko‘rsatiladi.
 
-Boshqa odam havolani ochsa, har ikki rejimda bir xil **“Murojaatingizni shuyerga yozing!”** matni va `Bekor qilish` tugmasi chiqadi. Xabar yuborilgach **“Xabaringiz yuborildi!”**, `Yana xabar yuborish` tugmasi va yozuvchining o‘z shaxsiy havolasi ko‘rsatiladi.
+Har bir kelgan xabar ostida `Yuboruvchini ko‘rish` va `Javob berish` tugmalari bor. Birinchisi havola egasiga yozuvchining ismi, username'i (bo‘lsa), Telegram ID si va profil havolasini ko‘rsatadi; ikkinchisi bot orqali javob yuboradi. Xabar kelishi bilan shaxsiy ma’lumot avtomatik ko‘rsatilmaydi, ammo bu bot to‘liq anonim emas. Telegram maxfiylik sozlamalari profil havolasi orqali bevosita yozishni cheklashi mumkin.
 
 ## Bepul imkoniyatlar
 
@@ -20,9 +19,9 @@ Boshqa odam havolani ochsa, har ikki rejimda bir xil **“Murojaatingizni shuyer
 - `/premium` — barcha mavjud imkoniyatlar bepul ekanini ko‘rsatadi; xarid tugmasi yo‘q.
 - `/help` — qisqa yordam; `/id` — o‘z Telegram ID raqamini ko‘rish.
 
-Anonim xabar ostida `Javob berish` tugmasi bor. Javob yozish oynasida `Bloklash` ham mavjud. Ikki tomonlama rejimda yozuvchini ko‘rish funksiyasi yo‘q: u shaxsni yashirish va’dasini buzadi. Bir tomonlama rejimda yozuvchining profili egaga bepul ko‘rsatiladi.
+Javob yozish oynasida `Bloklash` ham mavjud. Yuboruvchini ko‘rish va javob berish har bir havolada bepul ishlaydi.
 
-Bot `copyMessage` yoki oddiy `sendMessage` ishlatadi. Forward manbasi qo‘shilmaydi. Matn va media captionidagi maxsus Telegram mention formatlari olib tashlanadi. Foydalanuvchi matnida, fayl nomida yoki media ichida o‘zini tanituvchi ma’lumot bo‘lsa, bot uni avtomatik yashira olmaydi. Bot ishlashi uchun ID bog‘lanishlari SQLite bazasida saqlanadi; server operatori va Telegram platformasi bu ma’lumotlarga ega bo‘lishi mumkin.
+Bot `copyMessage` yoki oddiy `sendMessage` ishlatadi. Forward manbasi qo‘shilmaydi. Matn va media captionidagi maxsus Telegram mention formatlari olib tashlanadi. Foydalanuvchi matnida, fayl nomida yoki media ichida o‘zini tanituvchi ma’lumot bo‘lsa, bot uni avtomatik yashira olmaydi. Bot ishlashi uchun ID bog‘lanishlari bazada saqlanadi; havola egasi yuboruvchini ko‘rish tugmasi orqali bilishi mumkin.
 
 ## Ishga tushirish
 

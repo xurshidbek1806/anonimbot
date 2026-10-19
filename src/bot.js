@@ -1,16 +1,12 @@
 const keyboard = (...rows) => ({ inline_keyboard: rows });
 const button = (text, callback_data) => ({ text, callback_data });
 const menuLabels = {
-  anonymous: '🔒 Ikki tomonlama anonim',
-  openSender: '📩 Bir tomonlama xabar',
   links: '🔗 Mening havolalarim',
   profile: '📊 Profil',
   help: '❔ Yordam',
 };
 const mainMenu = () => ({
   keyboard: [
-    [{ text: menuLabels.anonymous }],
-    [{ text: menuLabels.openSender }],
     [{ text: menuLabels.links }],
     [{ text: menuLabels.profile }, { text: menuLabels.help }],
   ],
@@ -26,7 +22,7 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
   const linkUrl = (token) => `https://t.me/${username}?start=${token}`;
   const shareButton = (url) => ({
     text: 'Ulashish',
-    url: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Menga anonim xabar yuboring:')}`,
+    url: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Menga xabar yuboring:')}`,
   });
 
   async function personalLinkView(userId) {
@@ -34,7 +30,7 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
     const login = (await store.getSettings(userId))?.login;
     const url = linkUrl(login || link.token);
     return {
-      text: `<b>Shaxsiy havolangiz:</b>\n\n${url}\n\nHavolani ulashib, anonim suhbatni boshlashingiz mumkin.`,
+      text: `<b>Shaxsiy havolangiz:</b>\n\n${url}\n\nHavolani ulashib, xabarlar qabul qilishingiz mumkin.`,
       extra: { parse_mode: 'HTML', reply_markup: keyboard([shareButton(url)]) },
     };
   }
@@ -44,21 +40,10 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
     await api.sendMessage(userId, view.text, view.extra);
   }
 
-  async function refreshPersonalLink(userId, messageId) {
-    const view = await personalLinkView(userId);
-    if (messageId && api.editMessageText) {
-      try {
-        await api.editMessageText(userId, messageId, view.text, view.extra);
-        return;
-      } catch { /* An old/deleted message can be replaced with a fresh link. */ }
-    }
-    await api.sendMessage(userId, view.text, view.extra);
-  }
-
   async function sendHome(userId) {
     await store.clearContext(userId);
     await showPersonalLink(userId);
-    await api.sendMessage(userId, 'Anonim botga xush kelibsiz. Qanday havola yaratasiz?', {
+    await api.sendMessage(userId, 'Xabar botiga xush kelibsiz. Shaxsiy havolangiz tayyor.', {
       reply_markup: mainMenu(),
     });
   }
@@ -70,8 +55,7 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
       return;
     }
     for (const link of links.slice(0, 10)) {
-      const mode = link.mode === 'anonymous' ? 'Ikki tomonlama anonim' : 'Bir tomonlama xabar';
-      await api.sendMessage(userId, `${mode} · ${link.active ? 'Faol' : 'Yopilgan'}\n${linkUrl(link.token)}`, {
+      await api.sendMessage(userId, `${link.active ? 'Faol' : 'Yopilgan'} havola\n${linkUrl(link.token)}`, {
         reply_markup: link.active
           ? keyboard([shareButton(linkUrl(link.token))], [button('Havolani yopish', `close:${link.token}`)]) : undefined,
       });
@@ -153,7 +137,7 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
   async function showPremium(userId) {
     await api.sendMessage(userId,
       '💎 <b>Barcha qo‘shimcha imkoniyatlar siz uchun bepul:</b>\n\n' +
-      '• <b>Xabar yuboruvchini ko‘rish</b> — bir tomonlama havolaga kelgan xabar muallifining profilini ko‘rish.\n\n' +
+      '• <b>Xabar yuboruvchini ko‘rish</b> — kelgan har bir xabar muallifining profilini ko‘rish.\n\n' +
       '• <b>Profil statistikasi</b> — kirgan foydalanuvchilar va kelgan xabarlarni kunlik, haftalik va oylik ko‘rish.\n\n' +
       '• <b>Reklamalarsiz foydalanish</b> — oddiy foydalanishda reklama ko‘rsatilmaydi.\n\n' +
       '• <b>Avto javob</b> — havola orqali kirgan foydalanuvchiga belgilangan xabar avtomatik ko‘rsatiladi.\n\n' +
@@ -258,28 +242,17 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
       await api.sendMessage(visitorId, 'Bu havola orqali hozir xabar yubora olmaysiz.');
       return;
     }
-    if (link.mode === 'anonymous') {
-      const actions = keyboard([button('🔁 Javob berish', `reply:${conversation.id}`)]);
-      if (message.text) {
-        await api.sendMessage(link.owner_id,
-          `✉️ Sizda yangi anonim xabar bor!\n\n${message.text}`,
-          { reply_markup: actions, link_preview_options: { is_disabled: true }, protect_content: true });
-      } else {
-        await api.sendMessage(link.owner_id, '✉️ Sizda yangi anonim xabar bor!');
-        await relayMessage(message, link.owner_id, { reply_markup: actions });
-      }
+    const actions = keyboard(
+      [button('👤 Yuboruvchini ko‘rish', `sender:${conversation.id}`)],
+      [button('🔁 Javob berish', `reply:${conversation.id}`)],
+    );
+    if (message.text && message.text.length <= 3800) {
+      await api.sendMessage(link.owner_id,
+        `✉️ Sizda yangi xabar bor!\n\n${message.text}`,
+        { reply_markup: actions, link_preview_options: { is_disabled: true }, protect_content: true });
     } else {
-      const person = await store.getUser(visitorId);
-      const name = person?.first_name || 'Foydalanuvchi';
-      const handle = person?.username ? ` (@${person.username})` : '';
-      await api.sendMessage(link.owner_id, `Yangi xabar: ${name}${handle}\nProfil: tg://user?id=${visitorId}`, {
-        reply_markup: keyboard(
-          [{ text: '👤 Profilga o‘tish', url: `tg://user?id=${visitorId}` }],
-          [button('🚫 Bloklash', `block:${conversation.id}`)],
-        ),
-        link_preview_options: { is_disabled: true },
-      });
-      await relayMessage(message, link.owner_id);
+      await api.sendMessage(link.owner_id, '✉️ Sizda yangi xabar bor!');
+      await relayMessage(message, link.owner_id, { reply_markup: actions });
     }
     await store.recordIncomingMessage(link.owner_id, link.token, visitorId);
     await store.clearContext(visitorId);
@@ -375,12 +348,7 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
         });
       return;
     }
-    if (text === menuLabels.anonymous || text === menuLabels.openSender) {
-      await store.clearContext(userId);
-      await store.setPersonalLinkMode(userId,
-        text === menuLabels.anonymous ? 'anonymous' : 'open_sender');
-      return showPersonalLink(userId);
-    }
+    if (text === '🔒 Ikki tomonlama anonim' || text === '📩 Bir tomonlama xabar') return sendHome(userId);
     if (text === menuLabels.links) {
       await store.clearContext(userId);
       return showPersonalLink(userId);
@@ -452,7 +420,7 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
     }
     if (context.kind === 'owner_reply') {
       const conversation = await store.getConversation(context.target);
-      if (!conversation?.active || conversation.owner_id !== userId) {
+      if (!conversation || conversation.owner_id !== userId) {
         await store.clearContext(userId);
         await api.sendMessage(userId, 'Suhbat endi mavjud emas.');
         return;
@@ -499,22 +467,26 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
       await store.setAdsOptIn(userId, data === 'offers:on');
       return showOffers(userId);
     }
-    if (data.startsWith('mode:') || data.startsWith('make:')) {
-      const mode = data.slice(data.indexOf(':') + 1);
-      if (!['anonymous', 'open_sender'].includes(mode)) return;
-      await store.clearContext(userId);
-      const current = await store.getOrCreatePersonalLink(userId);
-      if (current.mode !== mode) await store.setPersonalLinkMode(userId, mode);
-      return refreshPersonalLink(userId, callback.message?.message_id);
-    }
+    if (data.startsWith('mode:') || data.startsWith('make:')) return sendHome(userId);
     if (data.startsWith('close:')) {
       const closed = await store.deactivateLink(data.slice(6), userId);
       await api.sendMessage(userId, closed ? 'Havola yopildi.' : 'Havola topilmadi yoki allaqachon yopilgan.');
       return;
     }
+    if (data.startsWith('sender:')) {
+      const conversation = await store.getConversation(data.slice(7));
+      if (!conversation || conversation.owner_id !== userId) return;
+      const person = await store.getUser(conversation.visitor_id);
+      const name = person?.first_name?.replace(/\s+/gu, ' ').trim() || 'Foydalanuvchi';
+      const handle = person?.username ? `@${person.username}` : 'yo‘q';
+      await api.sendMessage(userId,
+        `👤 Yuboruvchi\nIsm: ${name}\nUsername: ${handle}\nTelegram ID: ${conversation.visitor_id}`,
+        { reply_markup: keyboard([{ text: '👤 Profilga o‘tish', url: `tg://user?id=${conversation.visitor_id}` }]) });
+      return;
+    }
     if (data.startsWith('reply:')) {
       const conversation = await store.getConversation(data.slice(6));
-      if (!conversation?.active || conversation.owner_id !== userId) return;
+      if (!conversation || conversation.owner_id !== userId) return;
       await store.setContext(userId, 'owner_reply', conversation.id);
       await api.sendMessage(userId, 'Javobingizni yozing!', {
         reply_markup: keyboard(
