@@ -255,7 +255,6 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
       await relayMessage(message, link.owner_id, { reply_markup: actions });
     }
     await store.recordIncomingMessage(link.owner_id, link.token, visitorId);
-    await store.clearContext(visitorId);
     await api.sendMessage(visitorId, 'Xabaringiz yuborildi!', {
       reply_markup: keyboard([button('Yana xabar yuborish', `again:${link.token}`)]),
     });
@@ -263,7 +262,9 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
   }
 
   async function relayOwner(message, conversation) {
-    await relayMessage(message, conversation.visitor_id);
+    await relayMessage(message, conversation.visitor_id, {
+      reply_markup: keyboard([button('🔁 Javob berish', `again:${conversation.link_token}`)]),
+    });
     await store.clearContext(message.from.id);
     await api.sendMessage(message.chat.id, 'Javobingiz yuborildi!', {
       reply_markup: keyboard([button('Yana xabar yuborish', `reply:${conversation.id}`)]),
@@ -480,10 +481,11 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
       if (!conversation || conversation.owner_id !== userId) return;
       const person = await store.getUser(conversation.visitor_id);
       const name = person?.first_name?.replace(/\s+/gu, ' ').trim() || 'Foydalanuvchi';
-      const handle = person?.username ? `@${person.username}` : 'yo‘q';
+      const username = /^[A-Za-z0-9_]{5,32}$/.test(person?.username || '') ? person.username : null;
+      const handle = username ? `@${username}` : 'yo‘q';
       await api.sendMessage(userId,
         `👤 Yuboruvchi\nIsm: ${name}\nUsername: ${handle}\nTelegram ID: ${conversation.visitor_id}`,
-        { reply_markup: keyboard([{ text: '👤 Profilga o‘tish', url: `tg://user?id=${conversation.visitor_id}` }]) });
+        username ? { reply_markup: keyboard([{ text: '👤 Profilga o‘tish', url: `https://t.me/${username}` }]) } : {});
       return;
     }
     if (data.startsWith('reply:')) {

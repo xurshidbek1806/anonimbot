@@ -6,9 +6,9 @@ Node.js 24+ bot. Lokal testlarda SQLite, VPSdagi Docker deployda PostgreSQL ishl
 
 Har odamga **bitta shaxsiy havola** beriladi. `/start` avval havolani `Ulashish` tugmasi bilan ko‘rsatadi, so‘ng yozish maydoni ostida doim turadigan menyuni ochadi: `Mening havolalarim`, `Profil`, `Yordam`. Rejim tanlash yo‘q. Ilgari yaratilgan har ikkala turdagi havolalar ham ishlashda davom etadi va endi bir xil tartibda xabar yetkazadi.
 
-Boshqa odam havolani ochsa, **“Murojaatingizni shuyerga yozing!”** matni va `Bekor qilish` tugmasi chiqadi. Xabar yuborilgach **“Xabaringiz yuborildi!”**, `Yana xabar yuborish` tugmasi va yozuvchining o‘z shaxsiy havolasi ko‘rsatiladi.
+Boshqa odam havolani ochsa, **“Murojaatingizni shuyerga yozing!”** matni va `Bekor qilish` tugmasi chiqadi. Xabar yuborilgach **“Xabaringiz yuborildi!”**, `Yana xabar yuborish` tugmasi va yozuvchining o‘z shaxsiy havolasi ko‘rsatiladi. Yozuvchi tugmani bosmasdan ham keyingi xabarni yuborishi mumkin; egadan kelgan javob ostida ham `Javob berish` tugmasi chiqadi.
 
-Har bir kelgan xabar ostida `Yuboruvchini ko‘rish` va `Javob berish` tugmalari bor. Birinchisi havola egasiga yozuvchining ismi, username'i (bo‘lsa), Telegram ID si va profil havolasini ko‘rsatadi; ikkinchisi bot orqali javob yuboradi. `Javobingiz yuborildi!` xabari ostidagi `Yana xabar yuborish` tugmasi o‘sha suhbatga yana javob yozish imkonini beradi. Xabar kelishi bilan shaxsiy ma’lumot avtomatik ko‘rsatilmaydi, ammo bu bot to‘liq anonim emas. Telegram maxfiylik sozlamalari profil havolasi orqali bevosita yozishni cheklashi mumkin.
+Har bir kelgan xabar ostida `Yuboruvchini ko‘rish` va `Javob berish` tugmalari bor. Birinchisi havola egasiga yozuvchining ismi, username'i (bo‘lsa), Telegram ID si va username mavjud bo‘lsa profil havolasini ko‘rsatadi; ikkinchisi bot orqali javob yuboradi. `Javobingiz yuborildi!` xabari ostidagi `Yana xabar yuborish` tugmasi o‘sha suhbatga yana javob yozish imkonini beradi. Xabar kelishi bilan shaxsiy ma’lumot avtomatik ko‘rsatilmaydi, ammo bu bot to‘liq anonim emas. Username bo‘lmasa, Telegram maxfiyligi sababli profilga o‘tish tugmasi ko‘rsatilmaydi.
 
 ## Bepul imkoniyatlar
 

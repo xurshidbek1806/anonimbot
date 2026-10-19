@@ -82,7 +82,7 @@ test('every text message has sender and reply actions without exposing sender un
   assert.match(senderDetails.text, /Visitor/);
   assert.match(senderDetails.text, /@visitor_username/);
   assert.match(senderDetails.text, /Telegram ID: 202/);
-  assert.equal(senderDetails.extra.reply_markup.inline_keyboard[0][0].url, 'tg://user?id=202');
+  assert.equal(senderDetails.extra.reply_markup.inline_keyboard[0][0].url, 'https://t.me/visitor_username');
   const replyData = incomingActions[1][0].callback_data;
   await f.callback(owner, replyData);
   await f.message(owner, { text: 'Javob' });
@@ -95,8 +95,32 @@ test('every text message has sender and reply actions without exposing sender un
   const visitorMessages = f.calls.filter((c) => c.method === 'sendMessage' && c.chatId === '202');
   assert.ok(visitorMessages.some((c) => c.text === 'Javob'));
   assert.ok(visitorMessages.some((c) => c.text === 'Ikkinchi javob'));
+  const ownerReply = visitorMessages.find((c) => c.text === 'Javob');
+  assert.equal(ownerReply.extra.reply_markup.inline_keyboard[0][0].callback_data, `again:${link.token}`);
+  await f.message(visitor, { text: 'Ikkinchi savol' });
+  assert.ok(f.calls.some((c) => c.chatId === '101' && c.text?.includes('Ikkinchi savol')));
+  await f.callback(visitor, ownerReply.extra.reply_markup.inline_keyboard[0][0].callback_data);
+  assert.equal(f.store.getContext(visitor.id).kind, 'visitor');
+  await f.message(visitor, { text: 'Uchinchi savol' });
+  assert.ok(f.calls.some((c) => c.chatId === '101' && c.text?.includes('Uchinchi savol')));
   assert.ok(!f.calls.some((c) => c.chatId === '303' && c.text === 'Ikkinchi javob'));
   assert.ok(!visitorMessages.some((c) => c.text.includes('owner_username') || c.text.includes('101')));
+});
+
+test('sender without a username is shown without a privacy-restricted profile button', async (t) => {
+  const f = fixture();
+  t.after(() => f.db.close());
+  const { owner, another } = f.users;
+  await f.message(owner, { text: '/start' });
+  const link = f.store.getOrCreatePersonalLink(owner.id);
+  await f.message(another, { text: `/start ${link.token}` });
+  await f.message(another, { text: 'Salom' });
+  const incoming = f.calls.find((c) => c.chatId === '101' && c.text?.includes('Salom'));
+  await f.callback(owner, incoming.extra.reply_markup.inline_keyboard[0][0].callback_data);
+  const details = f.calls.findLast((c) => c.chatId === '101' && c.text?.startsWith('👤 Yuboruvchi'));
+  assert.match(details.text, /Telegram ID: 303/);
+  assert.match(details.text, /Username: yo‘q/);
+  assert.equal(details.extra.reply_markup, undefined);
 });
 
 test('old one-way links deliver media with the same actions and hide identity until requested', async (t) => {
