@@ -8,7 +8,7 @@ Har odamga **bitta shaxsiy havola** beriladi. `/start` avval havolani `Ulashish`
 
 Boshqa odam havolani ochsa, **“Murojaatingizni shuyerga yozing!”** matni va `Bekor qilish` tugmasi chiqadi. Xabar yuborilgach **“Xabaringiz yuborildi!”**, `Yana xabar yuborish` tugmasi va yozuvchining o‘z shaxsiy havolasi ko‘rsatiladi.
 
-Har bir kelgan xabar ostida `Yuboruvchini ko‘rish` va `Javob berish` tugmalari bor. Birinchisi havola egasiga yozuvchining ismi, username'i (bo‘lsa), Telegram ID si va profil havolasini ko‘rsatadi; ikkinchisi bot orqali javob yuboradi. Xabar kelishi bilan shaxsiy ma’lumot avtomatik ko‘rsatilmaydi, ammo bu bot to‘liq anonim emas. Telegram maxfiylik sozlamalari profil havolasi orqali bevosita yozishni cheklashi mumkin.
+Har bir kelgan xabar ostida `Yuboruvchini ko‘rish` va `Javob berish` tugmalari bor. Birinchisi havola egasiga yozuvchining ismi, username'i (bo‘lsa), Telegram ID si va profil havolasini ko‘rsatadi; ikkinchisi bot orqali javob yuboradi. `Javobingiz yuborildi!` xabari ostidagi `Yana xabar yuborish` tugmasi o‘sha suhbatga yana javob yozish imkonini beradi. Xabar kelishi bilan shaxsiy ma’lumot avtomatik ko‘rsatilmaydi, ammo bu bot to‘liq anonim emas. Telegram maxfiylik sozlamalari profil havolasi orqali bevosita yozishni cheklashi mumkin.
 
 ## Bepul imkoniyatlar
 

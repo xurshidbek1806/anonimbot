@@ -86,8 +86,16 @@ test('every text message has sender and reply actions without exposing sender un
   const replyData = incomingActions[1][0].callback_data;
   await f.callback(owner, replyData);
   await f.message(owner, { text: 'Javob' });
+  const confirmation = f.calls.findLast((c) => c.chatId === '101' && c.text === 'Javobingiz yuborildi!');
+  assert.equal(confirmation.extra.reply_markup.inline_keyboard[0][0].text, 'Yana xabar yuborish');
+  assert.equal(confirmation.extra.reply_markup.inline_keyboard[0][0].callback_data, replyData);
+  await f.callback(owner, confirmation.extra.reply_markup.inline_keyboard[0][0].callback_data);
+  assert.equal(f.calls.findLast((c) => c.chatId === '101').text, 'Javobingizni yozing!');
+  await f.message(owner, { text: 'Ikkinchi javob' });
   const visitorMessages = f.calls.filter((c) => c.method === 'sendMessage' && c.chatId === '202');
   assert.ok(visitorMessages.some((c) => c.text === 'Javob'));
+  assert.ok(visitorMessages.some((c) => c.text === 'Ikkinchi javob'));
+  assert.ok(!f.calls.some((c) => c.chatId === '303' && c.text === 'Ikkinchi javob'));
   assert.ok(!visitorMessages.some((c) => c.text.includes('owner_username') || c.text.includes('101')));
 });
 

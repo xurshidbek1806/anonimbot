@@ -265,7 +265,9 @@ export function createBot({ api, store, username, adminIds, wakeBroadcasts = () 
   async function relayOwner(message, conversation) {
     await relayMessage(message, conversation.visitor_id);
     await store.clearContext(message.from.id);
-    await api.sendMessage(message.chat.id, 'Javobingiz yuborildi!');
+    await api.sendMessage(message.chat.id, 'Javobingiz yuborildi!', {
+      reply_markup: keyboard([button('Yana xabar yuborish', `reply:${conversation.id}`)]),
+    });
   }
 
   async function handleAdminMessage(message, context) {
