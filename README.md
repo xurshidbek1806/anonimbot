@@ -54,3 +54,4 @@ Matn yoki media yuboriladi, kerak bo‘lsa HTTPS tugma qo‘shiladi, keyin ko‘
 ## Tekshirish
 
 `npm test`
+# anonimbot
