@@ -23,15 +23,147 @@ Javob yozish oynasida `Bloklash` ham mavjud. Yuboruvchini ko‘rish va javob ber
 
 Bot `copyMessage` yoki oddiy `sendMessage` ishlatadi. Forward manbasi qo‘shilmaydi. Matn va media captionidagi maxsus Telegram mention formatlari olib tashlanadi. Foydalanuvchi matnida, fayl nomida yoki media ichida o‘zini tanituvchi ma’lumot bo‘lsa, bot uni avtomatik yashira olmaydi. Bot ishlashi uchun ID bog‘lanishlari bazada saqlanadi; havola egasi yuboruvchini ko‘rish tugmasi orqali bilishi mumkin.
 
-## Ishga tushirish
+## Tez deploy (0 dan, toza serverda)
 
-1. [@BotFather](https://t.me/BotFather) orqali bot oching va token oling.
-2. `.env.example` nusxasini `.env` nomi bilan saqlang. `BOT_TOKEN` ni to‘ldiring. Admin ID ni bilish uchun botga `/id` yuboring, so‘ng `ADMIN_IDS` ga yozing (bir nechta ID vergul bilan). Lokal SQLite uchun `DATABASE_URL` qatorini olib tashlang; `DATABASE_PATH=./data/bot.sqlite` ixtiyoriy.
-3. `npm start` ishga tushiring. Bot avval webhook o‘rnatilgan bo‘lsa, uni o‘zingiz o‘chirishingiz kerak; bot avtomatik o‘chirmaydi.
+Kerakli narsa: **bot tokeni** va (ixtiyoriy) o‘z **Telegram ID** ingiz.
 
-Ma’lumotlar odatda `data/bot.sqlite` da saqlanadi. Doimiy serverda shu faylni backup qiling va botning bitta nusxasini ishga tushiring.
+1. [@BotFather](https://t.me/BotFather) → `/newbot` → token oling (`123456:ABC...` ko‘rinishida).
+2. Botga `/id` yuborib, o‘z Telegram ID ingizni bilib oling (admin bo‘lish uchun; bot ishga tushgandan keyin ham qilsa bo‘ladi).
+3. Quyidagi ikki usuldan birini tanlang. Ikkalasi ham bitta serverda, bitta bot uchun.
 
-## VPS deploy (infra PostgreSQL)
+> Bir bot tokeni uchun **faqat bitta** jarayon ishlasin (long polling). Boshqa joyda (lokal kompyuter, eski server) ishlayotgan nusxani avval to‘xtating. Botda webhook o‘rnatilgan bo‘lsa, bot ishga tushmaydi va xato beradi; uni o‘chirish uchun brauzerda `https://api.telegram.org/bot<TOKEN>/deleteWebhook` ni oching.
+
+### A) Docker bilan (tavsiya etiladi)
+
+Docker va Docker Compose v2 kerak. Docker bo‘lmasa, `curl -fsSL https://get.docker.com | sh` bilan o‘rnatish mumkin (yoki quyidagi **B** usulga o‘ting). PostgreSQL alohida o‘rnatilmaydi, u bot bilan birga konteynerda ko‘tariladi.
+
+```bash
+git clone https://github.com/xurshidbek1806/anonimbot.git
+cd anonimbot
+cp .env.example .env
+```
+
+`.env` ni oching (`nano .env`): `BOT_TOKEN` va `ADMIN_IDS` ni to‘ldiring, so‘ng baza parolini yarating:
+
+```bash
+echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
+chmod 600 .env
+```
+
+Ishga tushiring:
+
+```bash
+docker compose -f compose.standalone.yml up -d --build
+```
+
+Tekshirish: `docker compose -f compose.standalone.yml logs --tail=50 bot` oxirida `@botnomi ishga tushdi` chiqishi kerak. Server qayta yoqilganda ham bot o‘zi ko‘tariladi (`restart: unless-stopped`).
+
+Yangilash:
+
+```bash
+git pull
+docker compose -f compose.standalone.yml up -d --build
+```
+
+Zaxira nusxa (baza `pgdata` volume’ida saqlanadi, `docker compose down` uni o‘chirmaydi; `down -v` o‘chiradi):
+
+```bash
+docker compose -f compose.standalone.yml exec -T db pg_dump -U anonimbot anonimbot > backup.sql
+```
+
+### B) Docker’siz (faqat Node.js)
+
+Docker kerak emas. Bot ichki **SQLite** ishlatadi, alohida baza serveri o‘rnatish shart emas. Node.js **24 yoki yangi** kerak (`node:sqlite` Node 24 da bor).
+
+**1. Node.js 24 va git o‘rnatish** (Ubuntu/Debian):
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+node -v   # v24 yoki yuqori bo‘lishi kerak
+```
+
+(macOS: `brew install node`. Windows: [nodejs.org](https://nodejs.org) dan o‘rnating. Boshqa Linuxlarda [nvm](https://github.com/nvm-sh/nvm): `nvm install 24`.)
+
+**2. Loyihani olish va sozlash:**
+
+```bash
+git clone https://github.com/xurshidbek1806/anonimbot.git
+cd anonimbot
+npm ci --omit=dev
+cp .env.example .env
+nano .env    # BOT_TOKEN va ADMIN_IDS ni to‘ldiring; boshqa qatorlarga tegmang
+```
+
+**3. Sinab ko‘rish:**
+
+```bash
+npm start
+```
+
+`@botnomi ishga tushdi` chiqsa, botga Telegram’da `/start` yuboring. To‘xtatish: `Ctrl+C`.
+
+**4. Doimiy ishlatish** (terminal yopilganda ham ishlashi va server qayta yoqilganda o‘zi ko‘tarilishi uchun). Linux’da `systemd`:
+
+```bash
+sudo tee /etc/systemd/system/anonimbot.service >/dev/null <<EOF
+[Unit]
+Description=Anonimbot Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=$USER
+WorkingDirectory=$PWD
+ExecStart=$(command -v node) src/index.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now anonimbot
+```
+
+Loglar: `journalctl -u anonimbot -f`. Holat: `systemctl status anonimbot`.
+
+Systemd o‘rniga `pm2` ham bo‘ladi: `sudo npm i -g pm2 && pm2 start src/index.js --name anonimbot && pm2 save && pm2 startup`.
+
+Yangilash:
+
+```bash
+git pull
+npm ci --omit=dev
+sudo systemctl restart anonimbot
+```
+
+Ma’lumotlar `data/bot.sqlite` faylida. Zaxira uchun botni to‘xtatib, `data/` papkasini nusxalang (yoki `sqlite3 data/bot.sqlite ".backup 'backup.sqlite'"`).
+
+Tashqi PostgreSQL ishlatmoqchi bo‘lsangiz, `.env` ga `DATABASE_URL=postgresql://user:parol@host:5432/baza` qo‘shing; jadvallar o‘zi yaratiladi. `DATABASE_URL` bo‘lmasa SQLite ishlatiladi.
+
+### Sozlamalar (`.env`)
+
+| O‘zgaruvchi | Majburiy | Izoh |
+|---|---|---|
+| `BOT_TOKEN` | ha | BotFather tokeni |
+| `ADMIN_IDS` | yo‘q | Admin Telegram ID lari, vergul bilan |
+| `POSTGRES_PASSWORD` | faqat Docker (A) | `compose.standalone.yml` ichidagi baza paroli |
+| `DATABASE_URL` | yo‘q | Berilsa PostgreSQL, bo‘lmasa SQLite |
+| `DATABASE_PATH` | yo‘q | SQLite fayli, standart `./data/bot.sqlite` |
+
+`.env` va `data/` Git’ga va Docker image’ga kirmaydi.
+
+### Muammolar
+
+- `getMe: Unauthorized` (kod 401): `BOT_TOKEN` noto‘g‘ri yoki BotFather’da bekor qilingan. Tokenni qayta tekshiring.
+- `Bu botda webhook faol`: yuqoridagi `deleteWebhook` havolasini oching.
+- Bot javob bermayapti, loglarda xato yo‘q: shu token bilan boshqa joyda ham bot ishlayotgan bo‘lishi mumkin; ikkinchisini to‘xtating.
+- Docker’da `POSTGRES_PASSWORD ... kerak`: `.env` faylida shu qator yo‘q (yuqoridagi `echo ... >> .env` buyrug‘ini bajaring).
+
+## VPS deploy (mavjud infra PostgreSQL bilan)
+
+Bu bo‘lim faqat `xurshid` Docker tarmog‘i va `infra_pgsql` konteyneri bor serverga tegishli. Oddiy serverda yuqoridagi **Tez deploy** bo‘limidan foydalaning.
 
 `compose.yml` VPSdagi mavjud `xurshid` Docker tarmog‘i va `infra_pgsql` konteyneridan foydalanadi. `scripts/provision-db.sh` alohida `anonimbot` bazasi va rolini yaratadi; parol faqat serverdagi `.env` faylida saqlanadi. `.env` va `data/` Git yoki Docker image ichiga kirmaydi.
 
